@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { hasRole } from '../auth.js';
 
 export default function Reportes() {
     const [resumen, setResumen]     = useState(null);
@@ -32,14 +33,18 @@ export default function Reportes() {
         .catch(e => setError(e.message));
     }
 
+    const canDownloadCsv = hasRole('administrador', 'gerente');
+
     return (
         <div>
             <h1>Reportes</h1>
             {error && <div className="error-msg">{error}</div>}
 
-            <div className="card">
-                <button onClick={descargarCSV}>Exportar ventas a CSV</button>
-            </div>
+            {canDownloadCsv && (
+                <div className="card">
+                    <button onClick={descargarCSV}>Exportar ventas a CSV</button>
+                </div>
+            )}
 
             {resumen && (
                 <div className="row">

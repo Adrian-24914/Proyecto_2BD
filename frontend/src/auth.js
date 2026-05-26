@@ -16,3 +16,16 @@ export function clearSession() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
 }
+
+export function hasRole(...roles) {
+    const user = getUser();
+    return user ? roles.includes(user.rol) : false;
+}
+
+export const ROLES = {
+    ADMIN: 'administrador',
+    GERENTE: 'gerente',
+    CAJERO: 'cajero',
+    BODEGUERO: 'bodeguero',
+    CLIENTE_WEB: 'cliente_web',
+};

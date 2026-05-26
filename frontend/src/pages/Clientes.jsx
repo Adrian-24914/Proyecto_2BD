@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Toast from '../components/Toast.jsx';
+import { hasRole } from '../auth.js';
 
 const empty = { nombre: '', apellido: '', email: '', telefono: '' };
 
@@ -42,27 +43,32 @@ export default function Clientes() {
         } catch (e) { setToast({ msg: e.message, type: 'error' }); }
     }
 
+    const canEdit = hasRole('administrador', 'gerente', 'cajero');
+    const canDelete = hasRole('administrador', 'gerente');
+
     return (
         <div>
             <h1>Clientes</h1>
 
-            <div className="card">
-                <h3>{editing ? 'Editar cliente' : 'Nuevo cliente'}</h3>
-                <form onSubmit={submit}>
-                    <div className="row">
-                        <div><label>Nombre</label>
-                            <input value={form.nombre} onChange={e=>update('nombre', e.target.value)} /></div>
-                        <div><label>Apellido</label>
-                            <input value={form.apellido} onChange={e=>update('apellido', e.target.value)} /></div>
-                        <div><label>Email</label>
-                            <input type="email" value={form.email} onChange={e=>update('email', e.target.value)} /></div>
-                        <div><label>Telefono</label>
-                            <input value={form.telefono} onChange={e=>update('telefono', e.target.value)} /></div>
-                    </div>
-                    <button type="submit">{editing ? 'Guardar' : 'Crear'}</button>
-                    {editing && <button type="button" className="secondary" onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancelar</button>}
-                </form>
-            </div>
+            {canEdit && (
+                <div className="card">
+                    <h3>{editing ? 'Editar cliente' : 'Nuevo cliente'}</h3>
+                    <form onSubmit={submit}>
+                        <div className="row">
+                            <div><label>Nombre</label>
+                                <input value={form.nombre} onChange={e=>update('nombre', e.target.value)} /></div>
+                            <div><label>Apellido</label>
+                                <input value={form.apellido} onChange={e=>update('apellido', e.target.value)} /></div>
+                            <div><label>Email</label>
+                                <input type="email" value={form.email} onChange={e=>update('email', e.target.value)} /></div>
+                            <div><label>Telefono</label>
+                                <input value={form.telefono} onChange={e=>update('telefono', e.target.value)} /></div>
+                        </div>
+                        <button type="submit">{editing ? 'Guardar' : 'Crear'}</button>
+                        {editing && <button type="button" className="secondary" onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancelar</button>}
+                    </form>
+                </div>
+            )}
 
             <div className="card">
                 <table>
@@ -76,8 +82,9 @@ export default function Clientes() {
                                 <td>{c.email}</td>
                                 <td>{c.telefono}</td>
                                 <td>
-                                    <button className="secondary" onClick={()=>startEdit(c)}>Editar</button>{' '}
-                                    <button className="danger" onClick={()=>remove(c.id_cliente)}>Eliminar</button>
+                                    {canEdit && <button className="secondary" onClick={()=>startEdit(c)}>Editar</button>}
+                                    {canEdit && canDelete && ' '}
+                                    {canDelete && <button className="danger" onClick={()=>remove(c.id_cliente)}>Eliminar</button>}
                                 </td>
                             </tr>
                         ))}

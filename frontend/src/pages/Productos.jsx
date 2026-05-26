@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Toast from '../components/Toast.jsx';
+import { hasRole } from '../auth.js';
 
 const empty = {
     nombre: '', descripcion: '', precio_unitario: '',
@@ -71,41 +72,46 @@ export default function Productos() {
         } catch (e) { setToast({ msg: e.message, type: 'error' }); }
     }
 
+    const canEdit = hasRole('administrador', 'gerente', 'bodeguero');
+    const canDelete = hasRole('administrador');
+
     return (
         <div>
             <h1>Productos</h1>
 
-            <div className="card">
-                <h3>{editing ? 'Editar producto' : 'Nuevo producto'}</h3>
-                <form onSubmit={submit}>
-                    <div className="row">
-                        <div><label>Nombre</label>
-                            <input value={form.nombre} onChange={e=>update('nombre', e.target.value)} /></div>
-                        <div><label>Precio unitario</label>
-                            <input type="number" step="0.01" value={form.precio_unitario}
-                                   onChange={e=>update('precio_unitario', e.target.value)} /></div>
-                        <div><label>Stock</label>
-                            <input type="number" value={form.stock}
-                                   onChange={e=>update('stock', e.target.value)} /></div>
-                    </div>
-                    <div className="row">
-                        <div><label>Categoria</label>
-                            <select value={form.id_categoria} onChange={e=>update('id_categoria', e.target.value)}>
-                                <option value="">-- selecciona --</option>
-                                {categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
-                            </select></div>
-                        <div><label>Proveedor</label>
-                            <select value={form.id_proveedor} onChange={e=>update('id_proveedor', e.target.value)}>
-                                <option value="">-- selecciona --</option>
-                                {proveedores.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
-                            </select></div>
-                        <div><label>Descripcion</label>
-                            <input value={form.descripcion} onChange={e=>update('descripcion', e.target.value)} /></div>
-                    </div>
-                    <button type="submit">{editing ? 'Guardar' : 'Crear'}</button>
-                    {editing && <button type="button" className="secondary" onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancelar</button>}
-                </form>
-            </div>
+            {canEdit && (
+                <div className="card">
+                    <h3>{editing ? 'Editar producto' : 'Nuevo producto'}</h3>
+                    <form onSubmit={submit}>
+                        <div className="row">
+                            <div><label>Nombre</label>
+                                <input value={form.nombre} onChange={e=>update('nombre', e.target.value)} /></div>
+                            <div><label>Precio unitario</label>
+                                <input type="number" step="0.01" value={form.precio_unitario}
+                                       onChange={e=>update('precio_unitario', e.target.value)} /></div>
+                            <div><label>Stock</label>
+                                <input type="number" value={form.stock}
+                                       onChange={e=>update('stock', e.target.value)} /></div>
+                        </div>
+                        <div className="row">
+                            <div><label>Categoria</label>
+                                <select value={form.id_categoria} onChange={e=>update('id_categoria', e.target.value)}>
+                                    <option value="">-- selecciona --</option>
+                                    {categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
+                                </select></div>
+                            <div><label>Proveedor</label>
+                                <select value={form.id_proveedor} onChange={e=>update('id_proveedor', e.target.value)}>
+                                    <option value="">-- selecciona --</option>
+                                    {proveedores.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
+                                </select></div>
+                            <div><label>Descripcion</label>
+                                <input value={form.descripcion} onChange={e=>update('descripcion', e.target.value)} /></div>
+                        </div>
+                        <button type="submit">{editing ? 'Guardar' : 'Crear'}</button>
+                        {editing && <button type="button" className="secondary" onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancelar</button>}
+                    </form>
+                </div>
+            )}
 
             <div className="card">
                 <table>
@@ -123,8 +129,9 @@ export default function Productos() {
                                 <td>{p.categoria}</td>
                                 <td>{p.proveedor}</td>
                                 <td>
-                                    <button className="secondary" onClick={()=>startEdit(p)}>Editar</button>{' '}
-                                    <button className="danger" onClick={()=>remove(p.id_producto)}>Eliminar</button>
+                                    {canEdit && <button className="secondary" onClick={()=>startEdit(p)}>Editar</button>}
+                                    {canEdit && canDelete && ' '}
+                                    {canDelete && <button className="danger" onClick={()=>remove(p.id_producto)}>Eliminar</button>}
                                 </td>
                             </tr>
                         ))}
