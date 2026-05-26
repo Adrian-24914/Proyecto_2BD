@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const { sequelize } = require('./models');
+
 const auth        = require('./routes/auth');
 const productos   = require('./routes/productos');
 const clientes    = require('./routes/clientes');
@@ -32,9 +34,14 @@ app.use('/api/consultas',   authMiddleware, consultas);
 app.use('/api/reportes',    authMiddleware, reportes);
 
 app.use((err, req, res, next) => {
-    console.error(err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+  console.error(err);
+  res.status(500).json({ error: 'Error interno del servidor' });
 });
 
 const PORT = process.env.PORT || 4000;
+
+sequelize.authenticate()
+  .then(() => console.log('[Sequelize] Conexion establecida'))
+  .catch((err) => console.error('[Sequelize] Error de conexion:', err));
+
 app.listen(PORT, () => console.log(`Backend escuchando en :${PORT}`));

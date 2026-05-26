@@ -48,9 +48,9 @@ const Usuario = sequelize.define('usuarios', {
   rol: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'cajero' },
 }, { timestamps: false });
 
-Producto.belongsTo(Categoria, { foreignKey: 'id_categoria' });
-Producto.belongsTo(Proveedor, { foreignKey: 'id_proveedor' });
-Categoria.hasMany(Producto, { foreignKey: 'id_categoria' });
-Proveedor.hasMany(Producto, { foreignKey: 'id_proveedor' });
+Producto.belongsTo(Categoria, { foreignKey: 'id_categoria', as: 'categoria' });
+Producto.belongsTo(Proveedor, { foreignKey: 'id_proveedor', as: 'proveedor' });
+Categoria.hasMany(Producto, { foreignKey: 'id_categoria', as: 'productos' });
+Proveedor.hasMany(Producto, { foreignKey: 'id_proveedor', as: 'productos' });
 
 module.exports = { sequelize, Categoria, Proveedor, Producto, Cliente, Empleado, Usuario };

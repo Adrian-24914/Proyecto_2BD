@@ -1,10 +1,10 @@
 const express = require('express');
 const pool = require('../db');
+const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Listado principal: consume la VIEW vista_resumen_ventas
-router.get('/', async (req, res) => {
+router.get('/', requireRole('cajero', 'gerente', 'administrador'), async (req, res) => {
     try {
         const { rows } = await pool.query(
             'SELECT * FROM vista_resumen_ventas ORDER BY fecha DESC'
@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireRole('cajero', 'gerente', 'administrador'), async (req, res) => {
     try {
         const venta = await pool.query(
             'SELECT * FROM vista_resumen_ventas WHERE id_venta = $1',
@@ -36,66 +36,40 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Transaccion explicita con BEGIN / COMMIT / ROLLBACK
-router.post('/', async (req, res) => {
-    const { id_cliente, id_empleado, items } = req.body || {};
-    if (!id_cliente || !id_empleado || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: 'id_cliente, id_empleado e items son requeridos' });
-    }
-
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        let total = 0;
-
-        // 1. Bloquear productos y validar stock
-        for (const item of items) {
-            if (!item.id_producto || !item.cantidad || item.cantidad <= 0) {
-                throw new Error('Cada item requiere id_producto y cantidad > 0');
-            }
-            const r = await client.query(
-                'SELECT id_producto, nombre, stock, precio_unitario FROM productos WHERE id_producto = $1 FOR UPDATE',
-                [item.id_producto]
-            );
-            if (r.rows.length === 0) throw new Error(`Producto ${item.id_producto} no existe`);
-            const prod = r.rows[0];
-            if (prod.stock < item.cantidad) {
-                throw new Error(`Stock insuficiente para "${prod.nombre}" (disponible: ${prod.stock})`);
-            }
-            item._precio = Number(prod.precio_unitario);
-            total += item._precio * item.cantidad;
+router.post(
+    '/',
+    requireRole('cajero', 'gerente', 'administrador'),
+    async (req, res) => {
+        const { id_cliente, id_empleado, items } = req.body || {};
+        if (!id_cliente || !id_empleado || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'id_cliente, id_empleado e items son requeridos' });
         }
 
-        // 2. Insertar venta cabecera
-        const ventaIns = await client.query(
-            `INSERT INTO ventas (fecha, id_cliente, id_empleado, total)
-             VALUES (NOW(), $1, $2, $3) RETURNING id_venta`,
-            [id_cliente, id_empleado, total]
-        );
-        const id_venta = ventaIns.rows[0].id_venta;
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
 
-        // 3. Insertar detalle y descontar stock
-        for (const item of items) {
-            await client.query(
-                `INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario_momento)
-                 VALUES ($1,$2,$3,$4)`,
-                [id_venta, item.id_producto, item.cantidad, item._precio]
+            const itemsJson = JSON.stringify(items);
+            const result = await client.query(
+                'CALL registrar_venta($1, $2, $3::json, NULL, NULL, NULL)',
+                [id_cliente, id_empleado, itemsJson]
             );
-            await client.query(
-                'UPDATE productos SET stock = stock - $1 WHERE id_producto = $2',
-                [item.cantidad, item.id_producto]
-            );
+
+            await client.query('COMMIT');
+
+            const row = result.rows[0];
+            res.status(201).json({
+                success: true,
+                id_venta: row.p_id_venta,
+                total: row.p_total,
+            });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            res.status(400).json({ error: err.message });
+        } finally {
+            client.release();
         }
-
-        await client.query('COMMIT');
-        res.status(201).json({ success: true, id_venta, total });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        res.status(400).json({ error: err.message });
-    } finally {
-        client.release();
     }
-});
+);
 
 module.exports = router;
