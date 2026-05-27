@@ -1,33 +1,115 @@
-# Proyecto 2 — Gestión de Inventario y Ventas
-**CC3088 · Bases de Datos 1 · Universidad del Valle de Guatemala · Ciclo 1, 2026**
+# Proyecto 3 - Seguridad, Roles y Stored Procedures
 
-Aplicación web full-stack para una tienda: catálogo de productos, clientes, registro de ventas con control de stock transaccional, reportes y autenticación.
+**CC3088 - Bases de Datos 1 - Universidad del Valle de Guatemala - Ciclo 1, 2026**
 
-Stack: PostgreSQL 16 + Node.js (Express) + React (Vite) — orquestado con Docker Compose.
+Extension del Proyecto 2: gestion de inventario y ventas con seguridad a nivel de DBMS mediante 5 roles con GRANT/REVOKE, 6 stored procedures y ORM con Sequelize.
 
-## Levantando el proyecto
+Stack: PostgreSQL 16 + Node.js (Express + Sequelize) + React (Vite) + Docker Compose.
 
-1. Clonar el repositorio
-2. Copiar `.env.example` a `.env`
-3. Ejecutar:
+## Levantar el proyecto
 
-    docker compose up --build
+```bash
+cp .env.example .env
+docker compose up --build
+```
 
-4. Abrir http://localhost:3000
+Si ya existe un volumen de PostgreSQL del Proyecto 2, reiniciar la base para que se ejecuten los nuevos scripts:
 
-## Credenciales de base de datos
-- Usuario: proy2
-- Contraseña: secret
-- Base de datos: tienda_db
+```bash
+docker compose down -v
+docker compose up --build
+```
 
-## Usuario de prueba (login)
-- Username: admin
-- Password: admin123
+Abrir http://localhost:3000
+
+## Credenciales
+
+| Servicio | Usuario | Contrasena |
+| --- | --- | --- |
+| Base de datos | proy3 | secret |
+| Admin UI | admin_user | admin123 |
+
+## Usuarios de prueba por rol
+
+| Username | Contrasena | Rol | Permisos principales |
+| --- | --- | --- | --- |
+| admin_user | admin123 | administrador | Acceso total |
+| gerente_user | admin123 | gerente | Todo excepto eliminar ventas |
+| cajero_user | admin123 | cajero | Registrar ventas, ver productos y clientes |
+| bodeguero_user | admin123 | bodeguero | Gestionar stock de productos |
+| cliente_user | admin123 | cliente_web | Solo lectura del catalogo de productos |
+
+## Esquema de roles (DBMS)
+
+| Rol | Tablas con acceso | Operaciones |
+| --- | --- | --- |
+| administrador | Todas | SELECT, INSERT, UPDATE, DELETE |
+| gerente | Todas | SELECT total; INSERT/UPDATE en ventas, productos, clientes, empleados |
+| cajero | productos, categorias, proveedores, clientes, empleados, ventas, detalle_ventas | SELECT + INSERT en ventas; UPDATE stock en productos |
+| bodeguero | productos, categorias, proveedores | SELECT, INSERT, UPDATE |
+| cliente_web | productos, categorias | SELECT unicamente |
+
+## Stored Procedures
+
+| Procedimiento | Descripcion | IN/OUT | Transaccion |
+| --- | --- | --- | --- |
+| `registrar_venta` | Registra una venta completa con validacion de stock | Si | ROLLBACK por bloque de excepcion |
+| `actualizar_stock` | Actualiza stock de un producto con validacion | Si | No |
+| `crear_producto` | Inserta producto nuevo con validaciones | Si | No |
+| `crear_cliente` | Inserta cliente con manejo de email duplicado | Si | No |
+| `obtener_resumen_ventas` | Retorna KPIs: total ventas, ingresos del mes y producto top | Si | No |
+| `eliminar_cliente_seguro` | Elimina cliente solo si no tiene ventas asociadas | Si | No |
+
+## ORM (Sequelize)
+
+- `GET /api/productos` usa `Producto.findAll()` con includes de Categoria y Proveedor.
+- `PUT /api/productos/:id` usa `Producto.update()`.
+- `DELETE /api/productos/:id` usa `Producto.destroy()`.
+- `GET /api/clientes` usa `Cliente.findAll()`.
+- `PUT /api/clientes/:id` usa `Cliente.update()`.
 
 ## Servicios
+
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:4000
 - PostgreSQL: localhost:5432
+
+## Estructura
+
+```text
+.
+|-- docker-compose.yml
+|-- .env.example
+|-- db/
+|   |-- 01_ddl.sql
+|   |-- 02_seed.sql
+|   |-- 03_views_indexes.sql
+|   |-- 04_roles.sql
+|   |-- 05_usuarios_prueba.sql
+|   `-- 06_stored_procedures.sql
+|-- backend/
+|   |-- Dockerfile
+|   |-- package.json
+|   `-- src/
+|       |-- index.js
+|       |-- db.js
+|       |-- db-sequelize.js
+|       |-- models/
+|       |   `-- index.js
+|       |-- middleware/
+|       |   `-- auth.js
+|       `-- routes/
+`-- frontend/
+    |-- Dockerfile
+    |-- package.json
+    `-- src/
+        |-- auth.js
+        |-- App.jsx
+        |-- components/
+        |   |-- Navbar.jsx
+        |   `-- ProtectedRoute.jsx
+        `-- pages/
+```
 
 ## Diagrama ER
 
@@ -41,34 +123,8 @@ erDiagram
     PRODUCTOS ||--o{ DETALLE_VENTAS : incluido_en
 ```
 
-## Estructura
-
-```
-.
-├── docker-compose.yml
-├── .env / .env.example
-├── db/
-│   ├── 01_ddl.sql
-│   ├── 02_seed.sql
-│   └── 03_views_indexes.sql
-├── backend/
-│   ├── Dockerfile
-│   ├── package.json
-│   └── src/
-│       ├── index.js
-│       ├── db.js
-│       ├── middleware/auth.js
-│       └── routes/
-└── frontend/
-    ├── Dockerfile
-    ├── package.json
-    └── src/
-        ├── pages/
-        └── components/
-```
-
 ## Autor
 
-**Adrian Penagos — 24914**
-Universidad del Valle de Guatemala
-CC3088 — Bases de Datos 1 · Ciclo 1, 2026
+**Adrian Penagos - 24914**  
+Universidad del Valle de Guatemala  
+CC3088 - Bases de Datos 1 - Ciclo 1, 2026
