@@ -4,8 +4,8 @@
 
 -- ============================================================
 -- SP 1: registrar_venta
--- Transaccion con rollback por bloque EXCEPTION. Parametros IN + OUT.
--- Valida stock, inserta venta + detalle y descuenta stock.
+-- Transaccion explicita con COMMIT y ROLLBACK dentro del procedure.
+-- Parametros IN + OUT. Valida stock, inserta venta + detalle y descuenta stock.
 -- ============================================================
 CREATE OR REPLACE PROCEDURE registrar_venta(
   IN p_id_cliente INTEGER,
@@ -30,62 +30,85 @@ BEGIN
   p_id_venta := NULL;
   p_total := 0;
 
-  BEGIN
-    IF json_array_length(p_items) = 0 THEN
-      RAISE EXCEPTION 'La venta debe tener al menos un producto';
-    END IF;
+  IF p_items IS NULL OR json_typeof(p_items) <> 'array' THEN
+    p_error := 'La venta debe recibir un arreglo de productos';
+    ROLLBACK;
+    RETURN;
+  END IF;
 
-    INSERT INTO ventas (fecha, id_cliente, id_empleado, total)
-    VALUES (NOW(), p_id_cliente, p_id_empleado, 0)
-    RETURNING id_venta INTO p_id_venta;
+  IF json_array_length(p_items) = 0 THEN
+    p_error := 'La venta debe tener al menos un producto';
+    ROLLBACK;
+    RETURN;
+  END IF;
 
-    FOR v_item IN SELECT * FROM json_array_elements(p_items)
-    LOOP
-      v_id_prod := (v_item->>'id_producto')::INTEGER;
-      v_cantidad := (v_item->>'cantidad')::INTEGER;
+  IF NOT EXISTS (SELECT 1 FROM clientes WHERE id_cliente = p_id_cliente) THEN
+    p_error := 'Cliente no encontrado';
+    ROLLBACK;
+    RETURN;
+  END IF;
 
-      IF v_cantidad <= 0 THEN
-        RAISE EXCEPTION 'La cantidad debe ser mayor a 0 para el producto %', v_id_prod;
-      END IF;
+  IF NOT EXISTS (SELECT 1 FROM empleados WHERE id_empleado = p_id_empleado) THEN
+    p_error := 'Empleado no encontrado';
+    ROLLBACK;
+    RETURN;
+  END IF;
 
-      SELECT precio_unitario, stock, nombre
-        INTO v_precio, v_stock, v_nombre_prod
-        FROM productos
-       WHERE id_producto = v_id_prod
-         FOR UPDATE;
+  INSERT INTO ventas (fecha, id_cliente, id_empleado, total)
+  VALUES (NOW(), p_id_cliente, p_id_empleado, 0)
+  RETURNING id_venta INTO p_id_venta;
 
-      IF NOT FOUND THEN
-        RAISE EXCEPTION 'Producto % no existe', v_id_prod;
-      END IF;
+  FOR v_item IN SELECT * FROM json_array_elements(p_items)
+  LOOP
+    v_id_prod := NULLIF(v_item->>'id_producto', '')::INTEGER;
+    v_cantidad := NULLIF(v_item->>'cantidad', '')::INTEGER;
 
-      IF v_stock < v_cantidad THEN
-        RAISE EXCEPTION 'Stock insuficiente para "%" (disponible: %)', v_nombre_prod, v_stock;
-      END IF;
-
-      INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario_momento)
-      VALUES (p_id_venta, v_id_prod, v_cantidad, v_precio);
-
-      UPDATE productos
-         SET stock = stock - v_cantidad
-       WHERE id_producto = v_id_prod;
-
-      v_subtotal := v_subtotal + (v_precio * v_cantidad);
-    END LOOP;
-
-    UPDATE ventas
-       SET total = v_subtotal
-     WHERE id_venta = p_id_venta;
-
-    p_total := v_subtotal;
-
-  EXCEPTION
-    WHEN OTHERS THEN
-      -- ROLLBACK implicito del bloque interno al entrar al manejador.
-      p_error := SQLERRM;
+    IF v_id_prod IS NULL OR v_cantidad IS NULL OR v_cantidad <= 0 THEN
+      p_error := 'Cada item requiere id_producto y cantidad mayor a 0';
       p_id_venta := NULL;
       p_total := 0;
-      RAISE;
-  END;
+      ROLLBACK;
+      RETURN;
+    END IF;
+
+    SELECT precio_unitario, stock, nombre
+      INTO v_precio, v_stock, v_nombre_prod
+      FROM productos
+     WHERE id_producto = v_id_prod
+       FOR UPDATE;
+
+    IF NOT FOUND THEN
+      p_error := 'Producto ' || v_id_prod || ' no existe';
+      p_id_venta := NULL;
+      p_total := 0;
+      ROLLBACK;
+      RETURN;
+    END IF;
+
+    IF v_stock < v_cantidad THEN
+      p_error := 'Stock insuficiente para "' || v_nombre_prod || '" (disponible: ' || v_stock || ')';
+      p_id_venta := NULL;
+      p_total := 0;
+      ROLLBACK;
+      RETURN;
+    END IF;
+
+    INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario_momento)
+    VALUES (p_id_venta, v_id_prod, v_cantidad, v_precio);
+
+    UPDATE productos
+       SET stock = stock - v_cantidad
+     WHERE id_producto = v_id_prod;
+
+    v_subtotal := v_subtotal + (v_precio * v_cantidad);
+  END LOOP;
+
+  UPDATE ventas
+     SET total = v_subtotal
+   WHERE id_venta = p_id_venta;
+
+  p_total := v_subtotal;
+  COMMIT;
 END;
 $$;
 

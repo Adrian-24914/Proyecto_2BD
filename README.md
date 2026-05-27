@@ -53,7 +53,7 @@ Abrir http://localhost:3000
 
 | Procedimiento | Descripcion | IN/OUT | Transaccion |
 | --- | --- | --- | --- |
-| `registrar_venta` | Registra una venta completa con validacion de stock | Si | ROLLBACK por bloque de excepcion |
+| `registrar_venta` | Registra una venta completa con validacion de stock | Si | COMMIT/ROLLBACK explicitos dentro del SP |
 | `actualizar_stock` | Actualiza stock de un producto con validacion | Si | No |
 | `crear_producto` | Inserta producto nuevo con validaciones | Si | No |
 | `crear_cliente` | Inserta cliente con manejo de email duplicado | Si | No |

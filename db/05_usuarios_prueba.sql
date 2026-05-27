@@ -3,10 +3,10 @@
 -- ============================================================
 
 ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check;
+TRUNCATE usuarios RESTART IDENTITY CASCADE;
+
 ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check
   CHECK (rol IN ('administrador','gerente','cajero','bodeguero','cliente_web'));
-
-TRUNCATE usuarios RESTART IDENTITY CASCADE;
 
 INSERT INTO usuarios (username, password_hash, rol) VALUES
 ('admin_user',

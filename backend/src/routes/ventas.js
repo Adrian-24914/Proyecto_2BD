@@ -45,29 +45,22 @@ router.post(
             return res.status(400).json({ error: 'id_cliente, id_empleado e items son requeridos' });
         }
 
-        const client = await pool.connect();
         try {
-            await client.query('BEGIN');
-
             const itemsJson = JSON.stringify(items);
-            const result = await client.query(
+            const result = await pool.query(
                 'CALL registrar_venta($1, $2, $3::json, NULL, NULL, NULL)',
                 [id_cliente, id_empleado, itemsJson]
             );
-
-            await client.query('COMMIT');
-
             const row = result.rows[0];
+            if (row.p_error) return res.status(400).json({ error: row.p_error });
+
             res.status(201).json({
                 success: true,
                 id_venta: row.p_id_venta,
                 total: row.p_total,
             });
         } catch (err) {
-            await client.query('ROLLBACK');
             res.status(400).json({ error: err.message });
-        } finally {
-            client.release();
         }
     }
 );
